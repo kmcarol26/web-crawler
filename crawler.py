@@ -9,22 +9,21 @@ class Crawler:
     #TODO: redirect url removal
     def __init__(self,file,seed,dir) :
         #crawl limit is 1000
+        self.url = seed;
         self.CRAWL_COUNTER = 0
         self.depth = 1;
-        self.MAX_DEPTH = 6;
-        self.MAX_PAGES = 1000;
+        self.MAX_DEPTH = 3;
+        self.MAX_PAGES = 11;
         self.seed = seed
         self.html_doc=""
-        self.urls = set()
+        self.unique_crawled_urls = list()
+        self.unique_crawled_urls.append(str(self.depth))
         os.mkdir(dir)
         self.dir = dir
         self.copy_dir = dir+"/copies/"
         os.mkdir(self.copy_dir)
         self.url_file = open(dir+file,'w+')
         self.frontier = queue.Queue();
-        #write seed url to file
-        # print("write seed",seed)
-        self.write_url(seed,self.depth)
 
 
     #write url to file
@@ -36,7 +35,7 @@ class Crawler:
         self.url_file.write("\n")
 
 
-    #method to fetch resource
+    #method to fetch resource.add()
     def open_url(self,url):
         time.sleep(1)
         # print("Opening URL ",url)
@@ -59,7 +58,6 @@ class Crawler:
         return redirected_url
 
     # copy html content as raw txt file
-    #TO-DO:trim url to get filename
     def copy_docs(self,url,doc) :
             file_name = url.split("wiki/")[1]
             file_name = file_name.replace("/","_")
@@ -86,9 +84,9 @@ class Crawler:
     def copy_and_push(self,url,depth) :
         # self.copy_docs(url,content)
         self.frontier.put(url)
-        self.urls.add(url)
         # print("pushed",new_url)
-        self.write_url(url,depth)
+        # if url in self.unique_crawled_urls
+        # self.write_url(url,depth+1)
 
 # def test_print_urls():
 #
@@ -109,12 +107,11 @@ class Crawler:
             url = link.get('href');
             #if href is None
             if(url == None):
-                return
-
+                return2
             #add host prefix
             complete_url = "https://en.wikipedia.org" + url
             #if url is wiki's main page or if url is already crawled, ignore and continue
-            if( url == "/wiki/Main_Page" or complete_url in self.urls):
+            if( url == "/wiki/Main_Page" ):
                 continue
             else:
                 #only get urls that match with /wiki/ to avoid crawling
@@ -132,30 +129,41 @@ class Crawler:
                         # new_url = redirected_url(complete_url)
                         self.copy_and_push(complete_url,self.depth)
 
-    def crawl(self,url,depth):
-        self.CRAWL_COUNTER+=1;
-        print("CRAWLING URL# ",self.CRAWL_COUNTER)
-        if not(self.frontier.empty()) and self.depth <= self.MAX_DEPTH and self.CRAWL_COUNTER <= self.MAX_PAGES :
+
+    def crawl(self,url):
+        level = self.depth +1;
+        while not(self.frontier.empty()) and len(self.unique_crawled_urls)<= self.MAX_PAGES and self.depth <= self.MAX_DEPTH  :
+            self.CRAWL_COUNTER+=1;
+            if (str(self.depth) not in self.unique_crawled_urls) :
+                self.unique_crawled_urls.append(str(self.depth))
+            if (self.url not in self.unique_crawled_urls) :
+                self.unique_crawled_urls.append(self.url)
+
+            self.write_url(self.url,self.depth)
+            print("CRAWLING URL# ",self.CRAWL_COUNTER)
             #open url
-            self.open_url(url)
+            self.open_url(self.url)
             #push all urls in 'url' to the frontier queue
-            self.enqueue_frontier(url)
-            print("lentgh of urls",len(self.urls))
+            self.enqueue_frontier(self.url)
+
             #pop head of queue
             temp = self.frontier.get()
             # if head of queue is at same depth, crawl with same depth
-            if(temp != "NEW-LEVEL"):
-                self.crawl(temp,self.depth)
+            if(temp != str(level) and temp not in self.unique_crawled_urls):
+                self.url = temp;
+                continue
             #increment depth and crawl if head of queue is at a new depth
             else:
-                #put None at end of queue
-                self.frontier.put("NEW-LEVEL")
-                self.depth += 1
-                new_temp = self.frontier.get()
-                self.crawl(new_temp,self.depth)
-        print("END OF CRAWL")
-        print("lentgh of urls",len(self.urls))
-        return
+                    #put None at end of queue
+                    self.depth+=1
+                    level +=1
+                    self.frontier.put(str(level))
+                    new_temp = self.frontier.get()
+                    if ( new_temp not in self.unique_crawled_urls) :
+                        self.url = new_temp
+                        continue
+        return self.unique_crawled_urls
+
 
 seed_1 = "https://en.wikipedia.org/wiki/Time_zone";
 seed_2 = "https://en.wikipedia.org/wiki/Electric_car";
@@ -168,11 +176,10 @@ crawl_1 = Crawler("crawl_1.txt",seed_1,dir_1)
 # crawl_2 = Crawler("crawl_2.txt",seed_2,dir_2)
 # crawl_3 = Crawler("crawl_3.txt",seed_3,dir_3)
 
-urls_1 = crawl_1.urls;
-urls_1.add(seed_1)
-crawl_1.frontier.put("NEW-LEVEL")
-crawl_1.crawl(seed_1,2);
-os.rmdir(dir_1)
+crawl_1.frontier.put("2")
+
+print(crawl_1.crawl(seed_1));
+# os.rmdir(dir_1)
 # os.rmdir(dir_2)
 # os.rmdir(dir_3)
 
